@@ -9,9 +9,13 @@
   "categories": [
     "Other"
   ],
-    "repository": "https://github.com/brmdias/rundeck-vscode-extension",
+  "repository": "https://github.com/brmdias/rundeck-vscode-extension",
   "activationEvents": [
-  "onCommand:rundeck-vscode-extension.uploadJob"
+    "onCommand:rundeck-vscode-extension.uploadJob",
+    "onCommand:rundeck-vscode-extension.connectCluster",
+    "onCommand:rundeck-vscode-extension.testConnection",
+    "onCommand:rundeck-vscode-extension.clearConnection",
+    "onCommand:rundeck-vscode-extension.editJobScript"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -31,6 +35,10 @@
       {
         "command": "rundeck-vscode-extension.clearConnection",
         "title": "Clear Rundeck Connection"
+      },
+      {
+        "command": "rundeck-vscode-extension.editJobScript",
+        "title": "Edit Job Script"
       }
     ]
   },
@@ -43,14 +51,15 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.103.0",
+    "@types/js-yaml": "^4.0.9",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
+    "@types/vscode": "^1.103.0",
     "@typescript-eslint/eslint-plugin": "^8.39.0",
     "@typescript-eslint/parser": "^8.39.0",
-    "eslint": "^9.32.0",
-    "typescript": "^5.9.2",
     "@vscode/test-cli": "^0.0.11",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.32.0",
+    "typescript": "^5.9.2"
   }
 }
