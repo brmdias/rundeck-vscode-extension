@@ -16,7 +16,7 @@ Integrate Rundeck job management directly into VS Code. This extension lets you 
 
 ### Option A: Install Prebuilt VSIX (Recommended)
 
-1. Download `rundeck-vscode-extension-1.1.0.vsix` from the releases page (or use the packaged file in the repo root if present).
+1. Download `rundeck-vscode-extension-1.1.0.vsix` from the releases page - [link here](https://github.com/brmdias/rundeck-vscode-extension/releases/tag/v1.1.0).
 2. In VS Code run the command: `Extensions: Install from VSIX...` and select the file, or use the CLI:
    ```bash
    code --install-extension rundeck-vscode-extension-1.1.0.vsix
