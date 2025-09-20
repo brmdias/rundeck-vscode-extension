@@ -5,17 +5,20 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 // Temp script file path shared between commands
 let tempScriptFilePath: string | undefined;
+// Map temp script file path to job definition YAML file path
+const tempToJobFileMap: Map<string, string> = new Map();
 
 // Utility: open extracted script in a temporary file for editing
 export async function openScriptForEditing(script: string, fileExtension: string): Promise<vscode.TextDocument | undefined> {
   try {
-    const tempDir = os.tmpdir();
-    const tempFilePath = path.join(tempDir, `rundeck-script-${Date.now()}${fileExtension}`);
-    await fs.writeFile(tempFilePath, script, { encoding: 'utf8' });
-    const doc = await vscode.workspace.openTextDocument(tempFilePath);
-    await vscode.window.showTextDocument(doc, { preview: false });
-    tempScriptFilePath = tempFilePath;
-    return doc;
+  const tempDir = os.tmpdir();
+  const tempFilePath = path.join(tempDir, `rundeck-script-${Date.now()}${fileExtension}`);
+  await fs.writeFile(tempFilePath, script, { encoding: 'utf8' });
+  const doc = await vscode.workspace.openTextDocument(tempFilePath);
+  await vscode.window.showTextDocument(doc, { preview: false });
+  tempScriptFilePath = tempFilePath;
+  // The job file path will be set by the command that calls this function
+  return doc;
   } catch (err) {
     vscode.window.showErrorMessage(`Failed to open script for editing: ${err}`);
     return undefined;
@@ -56,6 +59,82 @@ export function clearRundeckConnection(context: vscode.ExtensionContext) {
 }
 
 export function activate(context: vscode.ExtensionContext) {
+  // Listen for save events on the temp script file
+  vscode.workspace.onDidSaveTextDocument(async (document) => {
+    // Check if this temp script file is mapped to a job definition file
+    const jobFilePath = tempToJobFileMap.get(document.fileName);
+    if (jobFilePath) {
+      console.log('DEBUG: Temp script file saved:', document.fileName);
+      // Read job YAML file
+      const jobFileUri = vscode.Uri.file(jobFilePath);
+      let fileData = await vscode.workspace.fs.readFile(jobFileUri);
+      let yamlText = Buffer.from(fileData).toString('utf8');
+      let jobDef: any;
+      try {
+        jobDef = yaml.load(yamlText);
+      } catch (err) {
+        vscode.window.showErrorMessage('Failed to parse job YAML file: ' + String(err));
+        return;
+      }
+      // Read latest script from temp file
+      let latestScript: string;
+      try {
+        latestScript = await fs.readFile(document.fileName, { encoding: 'utf8' });
+      } catch (err) {
+        vscode.window.showErrorMessage('Failed to read temp script file: ' + String(err));
+        return;
+      }
+      // Update script block in job YAML (object or array root)
+      if (Array.isArray(jobDef)) {
+        if (jobDef[0]?.sequence?.commands) {
+          const cmd = jobDef[0].sequence.commands.find((c: any) => c.script);
+          if (cmd) {
+            cmd.script = latestScript;
+          }
+        }
+      } else if (jobDef?.sequence?.commands) {
+        const cmd = jobDef.sequence.commands.find((c: any) => c.script);
+        if (cmd) {
+          cmd.script = latestScript;
+        }
+      }
+      // Dump updated YAML and write back to file
+      const updatedYaml = yaml.dump(jobDef);
+      await vscode.workspace.fs.writeFile(jobFileUri, Buffer.from(updatedYaml, 'utf8'));
+      // Optionally, reload the editor to reflect changes
+      // Find the editor for the job file and save
+      const jobEditor = vscode.window.visibleTextEditors.find(e => e.document.uri.fsPath === jobFilePath);
+      if (jobEditor) {
+        await jobEditor.document.save();
+      }
+      vscode.window.showInformationMessage('Job definition YAML file updated with latest script from temp file.');
+      console.log('DEBUG: Job YAML file updated with latest script.');
+    }
+  });
+  // Register the test connection health command
+  context.subscriptions.push(vscode.commands.registerCommand('rundeck-vscode-extension.testConnection', async () => {
+    const { token, url } = getRundeckConnection(context);
+    if (!token || !url) {
+      vscode.window.showErrorMessage('No Rundeck connection found. Please run "Connect to Rundeck cluster" first.');
+      return;
+    }
+    try {
+      const response = await fetch(`${url}/api/40/system/info`, {
+        method: 'GET',
+        headers: {
+          'X-Rundeck-Auth-Token': token,
+          'Accept': 'application/json'
+        }
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      const data = await response.json() as any;
+      vscode.window.showInformationMessage(`✅ Rundeck connection healthy: ${data.system?.rundeck?.version || 'Unknown version'} at ${url}`);
+    } catch (error: any) {
+      vscode.window.showErrorMessage(`Failed to connect to Rundeck: ${error.message}`);
+    }
+  }));
   // Register the edit job script command
   context.subscriptions.push(vscode.commands.registerCommand('rundeck-vscode-extension.editJobScript', async () => {
     let fileUri: vscode.Uri | undefined;
@@ -106,7 +185,11 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
     const { script, fileExtension } = extracted;
-    await openScriptForEditing(script, fileExtension);
+    const doc = await openScriptForEditing(script, fileExtension);
+    // Track the mapping from temp script file to job definition file
+    if (doc) {
+      tempToJobFileMap.set(doc.fileName, fileUri.fsPath);
+    }
     vscode.window.showInformationMessage(`Script opened for editing.`);
   }));
   // Register the upload job command
