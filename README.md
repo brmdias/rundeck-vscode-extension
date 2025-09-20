@@ -76,7 +76,6 @@ Run `Upload Rundeck Job`. If a project name is not set, you will be prompted for
 - `src/extension.ts`: Main extension logic and command registration
 - `package.json`: Extension manifest and command contributions
 - `test/extension.test.ts`: Example test file (expand for more coverage)
-- `.github/copilot-instructions.md`: AI agent instructions
 
 ## Configuration
 
@@ -85,7 +84,6 @@ No custom settings required. All connection parameters (API token, server URL, p
 ## Known Issues & Limitations
 
 - Minimal test coverage (expand `test/extension.test.ts` for more reliability)
-- Temp script files are not auto-cleaned; they remain in your system temp directory
  - Temp script files are not auto-cleaned; they remain in your system temp directory (e.g. `os.tmpdir()`); you may delete them manually if desired
 - Only the first job in a multi-job YAML file is currently considered for script editing
 - Advanced Rundeck import options (e.g., partial diffs, ACLs) are not exposed yet
