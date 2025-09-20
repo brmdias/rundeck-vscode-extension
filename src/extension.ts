@@ -5,8 +5,11 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 // Temp script file path shared between commands
 let tempScriptFilePath: string | undefined;
-// Map temp script file path to job definition YAML file path
+// Map temp script file path to job definition YAML file path (legacy single-script mapping)
 const tempToJobFileMap: Map<string, string> = new Map();
+// Multi-script metadata mapping: temp file -> job path + command index
+interface TempScriptMeta { jobPath: string; commandIndex: number; }
+const tempScriptMetaMap: Map<string, TempScriptMeta> = new Map();
 
 // Utility: open extracted script in a temporary file for editing
 export async function openScriptForEditing(script: string, fileExtension: string): Promise<vscode.TextDocument | undefined> {
@@ -59,56 +62,37 @@ export function clearRundeckConnection(context: vscode.ExtensionContext) {
 }
 
 export function activate(context: vscode.ExtensionContext) {
-  // Listen for save events on the temp script file
+  // Listen for save events on any temp script file and update only its mapped command index
   vscode.workspace.onDidSaveTextDocument(async (document) => {
-    // Check if this temp script file is mapped to a job definition file
-    const jobFilePath = tempToJobFileMap.get(document.fileName);
-    if (jobFilePath) {
-      console.log('DEBUG: Temp script file saved:', document.fileName);
-      // Read job YAML file
-      const jobFileUri = vscode.Uri.file(jobFilePath);
-      let fileData = await vscode.workspace.fs.readFile(jobFileUri);
-      let yamlText = Buffer.from(fileData).toString('utf8');
-      let jobDef: any;
-      try {
-        jobDef = yaml.load(yamlText);
-      } catch (err) {
-        vscode.window.showErrorMessage('Failed to parse job YAML file: ' + String(err));
+    const meta = tempScriptMetaMap.get(document.fileName);
+    if (!meta) return; // Not a tracked temp script
+    const { jobPath, commandIndex } = meta;
+    console.log(`DEBUG: Temp script saved -> job: ${jobPath} commandIndex: ${commandIndex}`);
+    try {
+      const jobFileUri = vscode.Uri.file(jobPath);
+      const fileData = await vscode.workspace.fs.readFile(jobFileUri);
+      let jobYaml = Buffer.from(fileData).toString('utf8');
+      let jobDef: any = yaml.load(jobYaml);
+      const isArrayRoot = Array.isArray(jobDef);
+      const jobObj = isArrayRoot ? jobDef[0] : jobDef;
+      if (!jobObj?.sequence || !Array.isArray(jobObj.sequence.commands)) {
+        vscode.window.showWarningMessage('Cannot update script: sequence.commands missing.');
         return;
       }
-      // Read latest script from temp file
-      let latestScript: string;
-      try {
-        latestScript = await fs.readFile(document.fileName, { encoding: 'utf8' });
-      } catch (err) {
-        vscode.window.showErrorMessage('Failed to read temp script file: ' + String(err));
+      const latestScript = await fs.readFile(document.fileName, { encoding: 'utf8' });
+      const cmd = jobObj.sequence.commands[commandIndex];
+      if (!cmd || typeof cmd.script !== 'string') {
+        vscode.window.showWarningMessage(`Script command at index ${commandIndex} no longer exists.`);
         return;
       }
-      // Update script block in job YAML (object or array root)
-      if (Array.isArray(jobDef)) {
-        if (jobDef[0]?.sequence?.commands) {
-          const cmd = jobDef[0].sequence.commands.find((c: any) => c.script);
-          if (cmd) {
-            cmd.script = latestScript;
-          }
-        }
-      } else if (jobDef?.sequence?.commands) {
-        const cmd = jobDef.sequence.commands.find((c: any) => c.script);
-        if (cmd) {
-          cmd.script = latestScript;
-        }
-      }
-      // Dump updated YAML and write back to file
-      const updatedYaml = yaml.dump(jobDef);
+      cmd.script = latestScript;
+      const updatedYaml = yaml.dump(isArrayRoot ? jobDef : jobObj);
       await vscode.workspace.fs.writeFile(jobFileUri, Buffer.from(updatedYaml, 'utf8'));
-      // Optionally, reload the editor to reflect changes
-      // Find the editor for the job file and save
-      const jobEditor = vscode.window.visibleTextEditors.find(e => e.document.uri.fsPath === jobFilePath);
-      if (jobEditor) {
-        await jobEditor.document.save();
-      }
-      vscode.window.showInformationMessage('Job definition YAML file updated with latest script from temp file.');
-      console.log('DEBUG: Job YAML file updated with latest script.');
+      const jobEditor = vscode.window.visibleTextEditors.find(e => e.document.uri.fsPath === jobPath);
+      if (jobEditor) await jobEditor.document.save();
+      vscode.window.showInformationMessage(`Updated job YAML (command index ${commandIndex}).`);
+    } catch (err: any) {
+      vscode.window.showErrorMessage(`Failed updating job YAML: ${err.message || err}`);
     }
   });
   // Register the test connection health command
@@ -179,18 +163,31 @@ export function activate(context: vscode.ExtensionContext) {
     } catch (e) {
       vscode.window.showErrorMessage('DEBUG: Error parsing YAML: ' + String(e));
     }
-    const extracted = extractScriptAndType(yamlText);
-    if (!extracted) {
-      vscode.window.showErrorMessage('No script found in job file.');
+    const scripts = listScriptCommands(yamlText);
+    if (scripts.length === 0) {
+      vscode.window.showErrorMessage('No script commands found in job file.');
       return;
     }
-    const { script, fileExtension } = extracted;
-    const doc = await openScriptForEditing(script, fileExtension);
-    // Track the mapping from temp script file to job definition file
-    if (doc) {
-      tempToJobFileMap.set(doc.fileName, fileUri.fsPath);
+    let chosen = scripts[0];
+    if (scripts.length > 1) {
+      const pick = await vscode.window.showQuickPick(
+        scripts.map(s => ({
+          label: s.description,
+          description: `Index ${s.index} | ${s.interpreter}`,
+          detail: s.script.split(/\r?\n/)[0].slice(0, 80),
+          value: s
+        })),
+        { placeHolder: 'Select a script command to edit' }
+      );
+      if (!pick) { return; }
+      chosen = pick.value;
     }
-    vscode.window.showInformationMessage(`Script opened for editing.`);
+    const doc = await openScriptForEditing(chosen.script, chosen.fileExtension);
+    if (doc) {
+      tempToJobFileMap.set(doc.fileName, fileUri.fsPath); // legacy
+      tempScriptMetaMap.set(doc.fileName, { jobPath: fileUri.fsPath, commandIndex: chosen.index });
+    }
+    vscode.window.showInformationMessage(`Opened script command index ${chosen.index} for editing.`);
   }));
   // Register the upload job command
   context.subscriptions.push(vscode.commands.registerCommand('rundeck-vscode-extension.uploadJob', async () => {
@@ -230,32 +227,26 @@ export function activate(context: vscode.ExtensionContext) {
     let fileData = await vscode.workspace.fs.readFile(fileUri);
     let yamlText = Buffer.from(fileData).toString('utf8');
     yamlText = yamlText.replace(/^[ \t]*(uuid|id):.*$/gm, '');
-    // Load job YAML and update script if needed
+    // Load job YAML and update any edited scripts before upload
     let jobDef = yaml.load(yamlText) as any;
-    if (tempScriptFilePath) {
-      console.log('DEBUG: Temp file exists: ', tempScriptFilePath);
-      try {
-        const latestScript = await fs.readFile(tempScriptFilePath, { encoding: 'utf8' });
-        // If jobDef is array, update first job; else update jobDef
-        if (Array.isArray(jobDef)) {
-          if (jobDef[0]?.sequence?.commands) {
-            const cmd = jobDef[0].sequence.commands.find((c: any) => c.script);
-            if (cmd) {
-              cmd.script = latestScript;
-            }
+    const isArrayRoot = Array.isArray(jobDef);
+    const jobObj = isArrayRoot ? jobDef[0] : jobDef;
+    if (jobObj?.sequence?.commands) {
+      // Find all temp scripts linked to this job path
+      const metas = [...tempScriptMetaMap.entries()].filter(([_, m]) => m.jobPath === fileUri!.fsPath);
+      for (const [tempPath, meta] of metas) {
+        try {
+          const content = await fs.readFile(tempPath, { encoding: 'utf8' });
+          if (jobObj.sequence.commands[meta.commandIndex] && typeof jobObj.sequence.commands[meta.commandIndex].script === 'string') {
+            jobObj.sequence.commands[meta.commandIndex].script = content;
+            console.log(`DEBUG: Patched script at index ${meta.commandIndex} from temp file ${tempPath}`);
+          } else {
+            console.warn(`DEBUG: Command index ${meta.commandIndex} missing or no script field.`);
           }
-        } else if (jobDef?.sequence?.commands) {
-          const cmd = jobDef.sequence.commands.find((c: any) => c.script);
-          if (cmd) {
-            cmd.script = latestScript;
-          }
+        } catch (e) {
+          console.warn(`DEBUG: Failed reading temp script ${tempPath}:`, e);
         }
-        console.log('DEBUG: Updated script in YAML.');
-      } catch (err) {
-        vscode.window.showErrorMessage(`Failed to read latest script for upload: ${err}`);
       }
-    } else {
-      console.log('DEBUG: No temp file detected on path: ', tempScriptFilePath);
     }
     // Remove uuid/id fields from all jobs
     const jobsArray = Array.isArray(jobDef) ? jobDef : [jobDef];
@@ -372,5 +363,40 @@ export function extractScriptAndType(yamlText: string): { script: string, type: 
     return null;
   } catch (e) {
     return null;
+  }
+}
+
+// NEW: List all script commands with metadata for multi-script editing
+export function listScriptCommands(yamlText: string): Array<{
+  index: number;
+  description: string;
+  script: string;
+  interpreter: string;
+  fileExtension: string;
+}> {
+  try {
+    let jobDef = yaml.load(yamlText) as any;
+    if (Array.isArray(jobDef)) jobDef = jobDef[0];
+    const sequence = jobDef?.sequence;
+    if (!sequence || !Array.isArray(sequence.commands)) return [];
+    const results: Array<{ index: number; description: string; script: string; interpreter: string; fileExtension: string; }> = [];
+    sequence.commands.forEach((cmd: any, idx: number) => {
+      if (cmd && typeof cmd.script === 'string') {
+        const interpreter = (cmd.scriptInterpreter || 'shell').toLowerCase();
+        let fileExtension = '.sh';
+        if (interpreter.includes('python')) fileExtension = '.py';
+        const description = (cmd.description && typeof cmd.description === 'string') ? cmd.description : `Script #${idx}`;
+        results.push({
+          index: idx,
+            description,
+          script: cmd.script,
+          interpreter,
+          fileExtension
+        });
+      }
+    });
+    return results;
+  } catch {
+    return [];
   }
 }
