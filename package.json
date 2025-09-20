@@ -2,7 +2,7 @@
   "name": "rundeck-vscode-extension",
   "displayName": "Rundeck VSCode Extension",
   "description": "",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "engines": {
     "vscode": "^1.103.0"
   },
