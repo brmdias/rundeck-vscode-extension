@@ -1,4 +1,3 @@
-
 # Rundeck VSCode Extension
 
 Integrate Rundeck job management directly into VS Code. This extension lets you connect to a Rundeck cluster, test the connection, and upload job definitions with a streamlined workflow.
@@ -15,10 +14,29 @@ Integrate Rundeck job management directly into VS Code. This extension lets you 
 
 ## Installation
 
+### Option A: Install Prebuilt VSIX (Recommended)
+
+1. Download `rundeck-vscode-extension-1.1.0.vsix` from the releases page (or use the packaged file in the repo root if present).
+2. In VS Code run the command: `Extensions: Install from VSIX...` and select the file, or use the CLI:
+   ```bash
+   code --install-extension rundeck-vscode-extension-1.1.0.vsix
+   ```
+3. Reload VS Code if prompted.
+
+### Option B: Build From Source
+
 1. Clone or download this repository
 2. Run `npm install` in the project folder
-3. Build with `npm run compile`
+3. Build with `npm run compile` (or `npm run watch` during development)
 4. Press F5 in VS Code to launch a new Extension Development Host
+5. (Optional) Package a VSIX with: `vsce package` which produces the `.vsix` file you can distribute.
+
+### Requirements
+
+- VS Code 1.88+ (tested)
+- Node.js 18+ for building from source
+- A Rundeck API token with permissions to read system info and import jobs
+
 
 ## Usage
 
@@ -68,13 +86,16 @@ No custom settings required. All connection parameters (API token, server URL, p
 
 - Minimal test coverage (expand `test/extension.test.ts` for more reliability)
 - Temp script files are not auto-cleaned; they remain in your system temp directory
+ - Temp script files are not auto-cleaned; they remain in your system temp directory (e.g. `os.tmpdir()`); you may delete them manually if desired
 - Only the first job in a multi-job YAML file is currently considered for script editing
 - Advanced Rundeck import options (e.g., partial diffs, ACLs) are not exposed yet
 - Deprecated helper `extractScriptAndType` retained for compatibility; new development should use multi-script flow
 
 ## Release Notes
 
-### v1.1.0 (Unreleased)
+See also the full [CHANGELOG](./CHANGELOG.md).
+
+### v1.1.0 – [Release Assets](https://github.com/brmdias/rundeck-vscode-extension/releases/tag/v1.1.0)
 - Multi-script editing with Quick Pick selection
 - Live YAML sync on temp script save
 - Upload patches all edited scripts automatically
