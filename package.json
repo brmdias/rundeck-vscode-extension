@@ -2,13 +2,14 @@
   "name": "rundeck-vscode-extension",
   "displayName": "Rundeck VSCode Extension",
   "description": "",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "engines": {
     "vscode": "^1.103.0"
   },
   "categories": [
     "Other"
   ],
+    "repository": "https://github.com/brmdias/rundeck-vscode-extension",
   "activationEvents": [
   "onCommand:rundeck-vscode-extension.uploadJob"
   ],
