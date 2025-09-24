@@ -1,16 +1,18 @@
 # Rundeck VSCode Extension
 
-Integrate Rundeck job management directly into VS Code. This extension lets you connect to a Rundeck cluster, test the connection, and upload job definitions with a streamlined workflow.
+Integrate Rundeck job management directly into VS Code. This extension lets you connect to a Rundeck cluster, test the connection, and upload job definitions with a streamlined workflow. It allows Rundeck job developers to take full advantage of the VS Code IDE: syntax highlighting, linting, refactoring, AI/code completion, Git diffing, search, and terminal tooling while editing embedded scripts.
 
 ## Features
 
 - Connect to a Rundeck cluster and persist credentials securely
 - Test Rundeck API connection health
-- Edit embedded job scripts directly in temporary files with live sync back to YAML
-- Upload job YAML files to a Rundeck project (removes `uuid` and `id` fields automatically)
-- Automatically patches YAML with any saved script edits before upload
+- Edit embedded job scripts in full IDE context (extensions, linting, AI assistance)
+- Live sync: saving a temp script immediately patches the YAML
+- Upload job YAML files (auto-removes `uuid` and `id`)
+- Automatically patches all edited scripts before upload
 - Remembers project name for future uploads
-- Uses VS Code UI for all prompts and file selection
+- Uses native VS Code UI for prompts and file selection
+- Leverages existing workspace tooling (formatters, Git, search, terminals) for Rundeck scripts
 
 ## Installation
 
@@ -84,7 +86,7 @@ No custom settings required. All connection parameters (API token, server URL, p
 ## Known Issues & Limitations
 
 - Minimal test coverage (expand `test/extension.test.ts` for more reliability)
- - Temp script files are not auto-cleaned; they remain in your system temp directory (e.g. `os.tmpdir()`); you may delete them manually if desired
+- Temp script files are not auto-cleaned (stored under your OS temp dir, e.g. `os.tmpdir()`); delete manually if desired
 - Only the first job in a multi-job YAML file is currently considered for script editing
 - Advanced Rundeck import options (e.g., partial diffs, ACLs) are not exposed yet
 - Deprecated helper `extractScriptAndType` retained for compatibility; new development should use multi-script flow
@@ -105,6 +107,22 @@ See also the full [CHANGELOG](./CHANGELOG.md).
 ## Contributing
 
 Pull requests and issues are welcome! Please follow standard TypeScript and VS Code extension best practices.
+
+## How to Raise Issues
+
+Use the GitHub Issues page to report bugs or request features:
+
+1. Search existing issues first.
+2. For bugs include:
+   - Extension version (see Release Notes / packaged VSIX name)
+   - VS Code version & OS
+   - Reproduction steps (minimal YAML if helpful)
+   - Expected vs actual behavior
+   - Relevant `DEBUG:` console output (omit secrets)
+3. For feature requests describe the workflow problem and desired outcome (avoid only proposing UI elements).
+4. Redact tokens, internal URLs, or sensitive job content.
+
+Triage order: critical upload/sync issues > auth problems > usability enhancements > feature ideas.
 
 ## License
 
