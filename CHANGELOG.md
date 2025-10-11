@@ -6,12 +6,10 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
-### Added
-- (placeholder)
-
-## [1.1.0] - 2025-09-20
+## [0.1.0] - 2025-09-20
 
 ### Added
+- Initial release: connect to Rundeck, test connection, and upload single job YAML files (automatic removal of `uuid` and `id`).
 - Multi-script job editing with Quick Pick selection when multiple script commands exist.
 - Live YAML synchronization: saving a temp script file updates the corresponding command in the job definition immediately.
 - Support for editing multiple scripts concurrently (each script opened in its own temp file).
@@ -31,8 +29,3 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ### Internal
 - Introduced metadata map linking temp script files to job path and command index.
 - Added additional debug logging around script selection and upload patching.
-
-## [1.0.0] - 2025-01-01
-
-### Added
-- Initial release: connect to Rundeck, test connection, and upload single job YAML files (automatic removal of `uuid` and `id`).
