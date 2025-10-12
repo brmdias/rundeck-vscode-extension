@@ -6,7 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
-## [0.1.0] - 2025-09-20
+## [0.1.1] - 2025-10-12
 
 ### Added
 - Initial release: connect to Rundeck, test connection, and upload single job YAML files (automatic removal of `uuid` and `id`).
@@ -14,8 +14,6 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Live YAML synchronization: saving a temp script file updates the corresponding command in the job definition immediately.
 - Support for editing multiple scripts concurrently (each script opened in its own temp file).
 - `listScriptCommands` helper to enumerate all script commands with metadata (index, description, interpreter, extension).
-
-### Changed
 - Upload workflow now patches all edited script commands back into the YAML before sending to Rundeck.
 - Job YAML always wrapped as an array prior to import to satisfy Rundeck format expectations.
 - Improved handling of array vs object YAML roots (first job auto-selected when array root).
